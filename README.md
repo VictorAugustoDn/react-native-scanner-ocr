@@ -1,0 +1,332 @@
+# @preeternal/react-native-document-scanner-plugin
+
+[![npm version](https://img.shields.io/npm/v/@preeternal/react-native-document-scanner-plugin.svg)](https://www.npmjs.com/package/@preeternal/react-native-document-scanner-plugin)
+[![npm downloads](https://img.shields.io/npm/dm/@preeternal/react-native-document-scanner-plugin.svg)](https://www.npmjs.com/package/@preeternal/react-native-document-scanner-plugin)
+
+
+> ### Heads‑up: Upstream now supports New Architecture
+> The original project, [WebsiteBeaver/react-native-document-scanner-plugin](https://github.com/WebsiteBeaver/react-native-document-scanner-plugin), now ships **New Architecture (TurboModule)** support as well.  
+> This fork remains **actively maintained** and API‑compatible. If you prefer the upstream package, you can safely use it; if you already rely on this fork, you can continue without changes.
+
+Fork of [react-native-document-scanner-plugin](https://github.com/WebsiteBeaver/react-native-document-scanner-plugin) with New Architecture (TurboModule) support and active maintenance.
+
+## Which package should I use?
+
+- **Use the upstream package** (`react-native-document-scanner-plugin`) if you want to stay on the original repository now that it also supports New Architecture.
+- **Use this fork** (`@preeternal/react-native-document-scanner-plugin`) if you want quicker iteration on fixes, Expo/EAS build hardening, and a maintained release cadence. The public API is identical.
+
+> **Attribution**: This package is a community‑maintained fork of the original project by **WebsiteBeaver**. Demo videos embedded below are from the original repository and are credited to their respective owners.
+
+This is a React Native plugin that lets you scan documents using Android and iOS. You can use it to create
+apps that let users scan notes, homework, business cards, receipts, or anything with a rectangular shape.
+
+| iOS                                                                                                                  | Android                                                                                                                  |
+| -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| ![Dollar-iOS](https://user-images.githubusercontent.com/26162804/160485984-e6c46563-56ee-4be9-b241-34a186e0029d.gif) | ![Dollar Android](https://user-images.githubusercontent.com/26162804/160306955-af9c5dd6-5cdf-4e2c-8770-c734a594985d.gif) |
+
+## Installation
+
+```bash
+yarn add @preeternal/react-native-document-scanner-plugin
+```
+
+After installing the plugin, you need to follow the steps below
+
+### iOS
+
+1. Open `ios/Podfile` and set `platform :ios` to `13` or higher
+
+2. iOS requires the following usage description be added and filled out for your app in `Info.plist`:
+
+- `NSCameraUsageDescription` (`Privacy - Camera Usage Description`)
+
+3. Install pods by running
+
+```bash
+cd ios && bundle exec pod install && cd ..
+```
+
+### Android
+
+**Note:** You don't need to prompt the user to accept camera permissions for this plugin to work unless you're using another plugin that requires the user to accept camera permissions. See [Android Camera Permissions](#android-camera-permissions).
+
+## Examples
+
+> Demo media in this README is courtesy of the original project (WebsiteBeaver).
+
+* [Basic Example](#basic-example)
+* [Limit Number of Scans](#limit-number-of-scans)
+
+### Basic Example
+
+```javascript
+import React, { useState, useEffect } from 'react'
+import { Image } from 'react-native'
+import DocumentScanner from '@preeternal/react-native-document-scanner-plugin'
+
+export default () => {
+  const [scannedImage, setScannedImage] = useState();
+
+  const scanDocument = async () => {
+    // start the document scanner
+    const { scannedImages } = await DocumentScanner.scanDocument()
+  
+    // get back an array with scanned image file paths
+    if (scannedImages.length > 0) {
+      // set the img src, so we can view the first scanned image
+      setScannedImage(scannedImages[0])
+    }
+  }
+
+  useEffect(() => {
+    // call scanDocument on load
+    scanDocument()
+  }, []);
+
+  return (
+    <Image
+      resizeMode="contain"
+      style={{ width: '100%', height: '100%' }}
+      source={{ uri: scannedImage }}
+    />
+  )
+}
+```
+
+Here's what this example looks like with several items
+
+<video src="https://user-images.githubusercontent.com/26162804/160264220-0a77a55c-33b1-492a-9617-6d2c083b0583.mp4" data-canonical-src="https://user-images.githubusercontent.com/26162804/160264220-0a77a55c-33b1-492a-9617-6d2c083b0583.mp4" controls="controls" muted="muted" class="d-block rounded-bottom-2 border-top width-fit" style="max-height:640px;"></video>
+
+<video src="https://user-images.githubusercontent.com/26162804/160264222-bef1ba3d-d6c1-43c8-ba2e-77ff5baef836.mp4" data-canonical-src="https://user-images.githubusercontent.com/26162804/160264222-bef1ba3d-d6c1-43c8-ba2e-77ff5baef836.mp4" controls="controls" muted="muted" class="d-block rounded-bottom-2 border-top width-fit" style="max-height:640px;"></video>
+
+<video src="https://user-images.githubusercontent.com/26162804/161643046-57536193-0c6c-4edf-8f29-6f3ef9854dc5.mp4" data-canonical-src="https://user-images.githubusercontent.com/26162804/161643046-57536193-0c6c-4edf-8f29-6f3ef9854dc5.mp4" controls="controls" muted="muted" class="d-block rounded-bottom-2 border-top width-fit" style="max-height:640px;"></video>
+
+<video src="https://user-images.githubusercontent.com/26162804/161643075-365b5008-4bc8-4507-969d-b2c188f372ec.mp4" data-canonical-src="https://user-images.githubusercontent.com/26162804/161643075-365b5008-4bc8-4507-969d-b2c188f372ec.mp4" controls="controls" muted="muted" class="d-block rounded-bottom-2 border-top width-fit" style="max-height:640px;"></video>
+
+<video src="https://user-images.githubusercontent.com/26162804/161643102-35283536-73a3-4b05-bd76-c06514ca3928.mp4" data-canonical-src="https://user-images.githubusercontent.com/26162804/161643102-35283536-73a3-4b05-bd76-c06514ca3928.mp4" controls="controls" muted="muted" class="d-block rounded-bottom-2 border-top width-fit" style="max-height:640px;"></video>
+
+<video src="https://user-images.githubusercontent.com/26162804/161643126-f5c2461d-768d-481c-8dee-4d74a0cae778.mp4" data-canonical-src="https://user-images.githubusercontent.com/26162804/161643126-f5c2461d-768d-481c-8dee-4d74a0cae778.mp4" controls="controls" muted="muted" class="d-block rounded-bottom-2 border-top width-fit" style="max-height:640px;"></video>
+
+<video src="https://user-images.githubusercontent.com/26162804/161643156-4ce1abac-d78b-4211-a99a-f0bebd40e2a6.mp4" data-canonical-src="https://user-images.githubusercontent.com/26162804/161643156-4ce1abac-d78b-4211-a99a-f0bebd40e2a6.mp4" controls="controls" muted="muted" class="d-block rounded-bottom-2 border-top width-fit" style="max-height:640px;"></video>
+
+<video src="https://user-images.githubusercontent.com/26162804/161643167-fc751455-1a1a-4b1c-b06f-a3a2cef0d0b0.mp4" data-canonical-src="https://user-images.githubusercontent.com/26162804/161643167-fc751455-1a1a-4b1c-b06f-a3a2cef0d0b0.mp4" controls="controls" muted="muted" class="d-block rounded-bottom-2 border-top width-fit" style="max-height:640px;"></video>
+
+<video src="https://user-images.githubusercontent.com/26162804/161643192-71db71af-392d-4b6a-b94d-851a3369dbf3.mp4" data-canonical-src="https://user-images.githubusercontent.com/26162804/161643192-71db71af-392d-4b6a-b94d-851a3369dbf3.mp4" controls="controls" muted="muted" class="d-block rounded-bottom-2 border-top width-fit" style="max-height:640px;"></video>
+
+<video src="https://user-images.githubusercontent.com/26162804/161643203-2a265cc1-5cf1-4474-b43c-7b1b2dcba704.mp4" data-canonical-src="https://user-images.githubusercontent.com/26162804/161643203-2a265cc1-5cf1-4474-b43c-7b1b2dcba704.mp4" controls="controls" muted="muted" class="d-block rounded-bottom-2 border-top width-fit" style="max-height:640px;"></video>
+
+### Limit Number of Scans
+
+You can limit the number of scans. For example if your app lets a user scan a business 
+card you might want them to only capture the front and back. In this case you can set
+maxNumDocuments to 2. This only works on Android.
+
+```javascript
+import React, { useState, useEffect } from 'react'
+import { Image } from 'react-native'
+import DocumentScanner from '@preeternal/react-native-document-scanner-plugin'
+
+export default () => {
+  const [scannedImage, setScannedImage] = useState();
+
+  const scanDocument = async () => {
+    // start the document scanner
+    const { scannedImages } = await DocumentScanner.scanDocument({
+      maxNumDocuments: 2
+    })
+  
+    // get back an array with scanned image file paths
+    if (scannedImages.length > 0) {
+      // set the img src, so we can view the first scanned image
+      setScannedImage(scannedImages[0])
+    }
+  }
+
+  useEffect(() => {
+    // call scanDocument on load
+    scanDocument()
+  }, []);
+
+  return (
+    <Image
+      resizeMode="contain"
+      style={{ width: '100%', height: '100%' }}
+      source={{ uri: scannedImage }}
+    />
+  )
+}
+```
+
+<video src="https://user-images.githubusercontent.com/26162804/161643345-6fe15f33-9414-46f5-b5d5-24d88948e801.mp4" data-canonical-src="https://user-images.githubusercontent.com/26162804/161643345-6fe15f33-9414-46f5-b5d5-24d88948e801.mp4" controls="controls" muted="muted" class="d-block rounded-bottom-2 border-top width-fit" style="max-height:640px;"></video>
+
+## Differences from the original
+
+- New Architecture (TurboModule) support — **now also available upstream**; this fork shipped it earlier and keeps parity.
+- Additional hardening for Expo/EAS and CI examples.
+- Minor documentation updates and ongoing maintenance.
+
+## Documentation
+
+* [`scanDocument(...)`](#scandocument)
+* [Interfaces](#interfaces)
+* [Enums](#enums)
+
+### Response sanitization (since v0.2.2)
+
+The module now sanitizes results on both platforms, so you no longer need to post‑filter `scannedImages` in JS:
+
+- Android: for `responseType: 'base64'` only non‑empty base64 strings are returned; for URI responses the module verifies the URI is readable via `ContentResolver` and drops unreachable items.
+- iOS: trims strings, normalizes `file://` URLs to filesystem paths and checks file existence before returning.
+
+As a result `scannedImages` contains only valid items. Example:
+
+```ts
+const { status, scannedImages } = await DocumentScanner.scanDocument({ responseType: 'imageFilePath' })
+if (status === 'success' && scannedImages.length) {
+  // All items are valid URIs or base64 strings depending on responseType
+  setImage(scannedImages[0])
+}
+```
+
+### scanDocument(...)
+
+```typescript
+scanDocument(options?: ScanDocumentOptions | undefined) => Promise<ScanDocumentResponse>
+```
+
+Opens the camera, and starts the document scan
+
+| Param         | Type                                                                |
+| ------------- | ------------------------------------------------------------------- |
+| **`options`** | <code><a href="#scandocumentoptions">ScanDocumentOptions</a></code> |
+
+**Returns:** <code>Promise&lt;<a href="#scandocumentresponse">ScanDocumentResponse</a>&gt;</code>
+
+--------------------
+
+
+### Interfaces
+
+
+#### ScanDocumentResponse
+
+| Prop                | Type                                                                              | Description                                                                                                                       |
+| ------------------- | --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| **`scannedImages`** | <code>string[]</code>                                                             | Array of valid file URIs or base64 strings (already sanitized by the module).                                                     |
+| **`status`**        | <code><a href="#scandocumentresponsestatus">ScanDocumentResponseStatus</a></code> | The status lets you know if the document scan completes successfully, or if the user cancels before completing the document scan. |
+
+
+#### ScanDocumentOptions
+
+| Prop                    | Type                                                  | Description                                                                                                                                                                                                                                                                                                                               | Default                                   |
+| ----------------------- | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| **`croppedImageQuality`**   | <code>number</code>                                   | The quality of the cropped image from 0 - 100. 100 is the best quality.                                                                                                                                                                                                                                                | <code>: 100</code>                         |
+| **`maxNumDocuments`**   | <code>number</code>                                   | Android only: The maximum number of photos an user can take (not counting photo retakes)                                                                                                                                                                                                                                                  | <code>: undefined</code>                         |
+| **`responseType`**      | <code><a href="#responsetype">ResponseType</a></code> | The response comes back in this format on success. It can be the document scan image file paths or base64 images.                                                                                                                                                                                                                         | <code>: ResponseType.ImageFilePath</code> |
+
+
+### Enums
+
+
+#### ScanDocumentResponseStatus
+
+| Members       | Value                  | Description                                                                                               |
+| ------------- | ---------------------- | --------------------------------------------------------------------------------------------------------- |
+| **`Success`** | <code>'success'</code> | The status comes back as success if the document scan completes successfully.                             |
+| **`Cancel`**  | <code>'cancel'</code>  | The status comes back as cancel if the user closes out of the camera before completing the document scan. |
+
+
+#### ResponseType
+
+| Members             | Value                        | Description                                                                     |
+| ------------------- | ---------------------------- | ------------------------------------------------------------------------------- |
+| **`Base64`**        | <code>'base64'</code>        | Use this response type if you want document scan returned as base64 images.     |
+| **`ImageFilePath`** | <code>'imageFilePath'</code> | Use this response type if you want document scan returned as inmage file paths. |
+
+
+## Common Mistakes
+
+* [Android Camera Permissions](#android-camera-permissions)
+
+### Android Camera Permissions
+
+You don't need to request camera permissions unless you're using another camera plugin that adds `<uses-permission android:name="android.permission.CAMERA" />` to the application's `AndroidManifest.xml`.
+
+In that case if you don't request camera permissions you get this error
+`Error: error - error opening camera: Permission Denial: starting Intent { act=android.media.action.IMAGE_CAPTURE`
+
+Here's an example of how to request camera permissions.
+
+```javascript
+import React, { useState, useEffect } from 'react'
+import { Platform, PermissionsAndroid, Image, Alert } from 'react-native'
+import DocumentScanner from '@preeternal/react-native-document-scanner-plugin'
+
+export default () => {
+  const [scannedImage, setScannedImage] = useState();
+
+  const scanDocument = async () => {
+    // prompt user to accept camera permission request if they haven't already
+    if (Platform.OS === 'android' && await PermissionsAndroid.request(
+      PermissionsAndroid.PERMISSIONS.CAMERA
+    ) !== PermissionsAndroid.RESULTS.GRANTED) {
+      Alert.alert('Error', 'User must grant camera permissions to use document scanner.')
+      return
+    }
+
+    // start the document scanner
+    const { scannedImages } = await DocumentScanner.scanDocument()
+  
+    // get back an array with scanned image file paths
+    if (scannedImages.length > 0) {
+      // set the img src, so we can view the first scanned image
+      setScannedImage(scannedImages[0])
+    }
+  }
+
+  useEffect(() => {
+    // call scanDocument on load
+    scanDocument()
+  }, []);
+
+  return (
+    <Image
+      resizeMode="contain"
+      style={{ width: '100%', height: '100%' }}
+      source={{ uri: scannedImage }}
+    />
+  )
+}
+```
+
+## Migrating between upstream and this fork
+
+Both packages expose the same public API. To switch:
+
+- **From this fork to upstream**
+  ```bash
+  yarn remove @preeternal/react-native-document-scanner-plugin
+  yarn add react-native-document-scanner-plugin
+  cd ios && pod install && cd -
+  ```
+
+- **From upstream to this fork**
+  ```bash
+  yarn remove react-native-document-scanner-plugin
+  yarn add @preeternal/react-native-document-scanner-plugin
+  cd ios && pod install && cd -
+  ```
+
+## Contributing
+
+- [Development workflow](CONTRIBUTING.md#development-workflow)
+- [Sending a pull request](CONTRIBUTING.md#sending-a-pull-request)
+- [Code of conduct](CODE_OF_CONDUCT.md)
+
+## Credits
+
+This project builds on the excellent work by [WebsiteBeaver/react-native-document-scanner-plugin](https://github.com/WebsiteBeaver/react-native-document-scanner-plugin). The original repository is MIT‑licensed; original copyright notices are preserved in this fork’s LICENSE.
+
+## License
+
+MIT
