@@ -54,9 +54,22 @@ export enum ScanDocumentResponseStatus {
   Cancel = 'cancel',
 }
 
+export type ScannedImage = {
+  uri: string;
+  success: boolean;
+  ocrData?: {
+    rawText: string;
+    cpf?: string;
+    rg?: string;
+    dataNascimento?: string;
+    sexo?: string;
+    nome?: string;
+  };
+};
+
 type ScanDocumentSuccess = {
   status: ScanDocumentResponseStatus.Success;
-  scannedImages: string[];
+  scannedImages: ScannedImage[];
 };
 
 type ScanDocumentCancel = {
@@ -78,7 +91,6 @@ export interface Spec extends TurboModule {
   scanDocument(options: ScanDocumentOptions): Promise<ScanDocumentResponse>;
 }
 
-const DocumentScanner =
-  TurboModuleRegistry.getEnforcing<Spec>('DocumentScanner');
+const DocumentScanner = TurboModuleRegistry.getEnforcing<Spec>('DocumentOcr');
 
 export default DocumentScanner;
