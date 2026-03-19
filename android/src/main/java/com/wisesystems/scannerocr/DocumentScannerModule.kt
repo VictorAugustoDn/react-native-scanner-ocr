@@ -21,6 +21,7 @@ import com.google.mlkit.vision.documentscanner.GmsDocumentScanner
 import com.google.mlkit.vision.documentscanner.GmsDocumentScannerOptions
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanning
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanningResult
+import com.google.mlkit.vision.text.Text
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import kotlinx.coroutines.Dispatchers
@@ -30,6 +31,16 @@ import java.io.FileOutputStream
 import java.lang.ref.WeakReference
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
+
+// Estrutura de dados limpa para organizar o retorno do OCR
+data class ExtractedData(
+    val cpf: String?,
+    val rg: String?,
+    val birthDate: String?,
+    val issueDate: String?,
+    val name: String?,
+    val gender: String?
+)
 
 @ReactModule(name = DocumentScannerModule.NAME)
 class DocumentScannerModule(reactContext: ReactApplicationContext) :
@@ -63,14 +74,13 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
         pendingPromise = promise
         hostActivityRef = WeakReference(activity)
         
-        // Garante visibilidade das barras (fix Android 15)
         ensureSystemBarsVisible(activity)
 
         initLauncher(activity)
         
         val builder = GmsDocumentScannerOptions.Builder()
             .setResultFormats(GmsDocumentScannerOptions.RESULT_FORMAT_JPEG)
-            .setScannerMode(GmsDocumentScannerOptions.SCANNER_MODE_FULL) // FULL melhora a qualidade pra OCR
+            .setScannerMode(GmsDocumentScannerOptions.SCANNER_MODE_BASE) 
 
         if (options.hasKey("maxNumDocuments")) {
             builder.setPageLimit(options.getInt("maxNumDocuments"))
@@ -108,15 +118,12 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
                         for (page in pages) {
                             val originalUri = page.imageUri ?: continue
                             
-                            // 1. Carrega o bitmap e ajusta rotação pelo Exif
                             val bitmap = loadBitmapFromUri(activity, originalUri) 
                             var finalUriString = originalUri.toString() 
 
                             if (bitmap != null) {
-                                // 2. Executa o OCR na imagem alinhada
                                 val ocrData = decodeTextWithMLKit(bitmap)
 
-                                // 3. Salva a imagem final com qualidade máxima em cache
                                 val timestamp = System.currentTimeMillis()
                                 val newPath = saveImageToCache(activity, bitmap, "scan_ocr_${timestamp}_$index")
                                 
@@ -168,34 +175,19 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
             recognizer.process(image)
                 .addOnSuccessListener { visionText ->
                     val result = WritableNativeMap()
-                    val fullText = visionText.text
                     
-                    result.putString("rawText", fullText) // Útil para debugar no React Native
+                    // Texto bruto mantido para debug no JS
+                    result.putString("rawText", visionText.text)
                     
-                    // Extração de Padrões
-                    val cpf = Regex("""\d{3}\.?\d{3}\.?\d{3}-?\d{2}""").find(fullText)?.value
-                    val rg = Regex("""\d{1,2}\.?\d{3}\.?\d{3}-?[0-9a-zA-Z]{1,2}""").find(fullText)?.value
+                    // Nossa extração baseada em blocos e linhas entra aqui
+                    val extractedData = extractStructuredData(visionText)
                     
-                    // Pega todas as datas. Em documentos, a primeira costuma ser o nascimento, a segunda a emissão.
-                    val dates = Regex("""\d{2}/\d{2}/\d{4}""").findAll(fullText).map { it.value }.toList()
-                    val birthDate = dates.firstOrNull()
-
-                    // Extração de Sexo
-                    var sexo = "Desconhecido"
-                    if (fullText.contains("MASCULINO", ignoreCase = true) || Regex("""\bSEXO\b[\s\S]{0,10}\bM\b""").containsMatchIn(fullText)) {
-                        sexo = "M"
-                    } else if (fullText.contains("FEMININO", ignoreCase = true) || Regex("""\bSEXO\b[\s\S]{0,10}\bF\b""").containsMatchIn(fullText)) {
-                        sexo = "F"
-                    }
-
-                    // Tenta adivinhar o nome (Normalmente em Maiúsculo, ignorando labels conhecidas)
-                    val name = parseNameFromText(fullText)
-
-                    result.putString("cpf", cpf)
-                    result.putString("rg", rg)
-                    result.putString("dataNascimento", birthDate)
-                    result.putString("sexo", sexo)
-                    result.putString("nome", name)
+                    result.putString("cpf", extractedData.cpf)
+                    result.putString("rg", extractedData.rg)
+                    result.putString("dataNascimento", extractedData.birthDate)
+                    result.putString("dataEmissao", extractedData.issueDate)
+                    result.putString("nome", extractedData.name)
+                    result.putString("sexo", extractedData.gender)
 
                     continuation.resume(result)
                 }
@@ -204,21 +196,128 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
                 }
         }
 
-    private fun parseNameFromText(text: String): String? {
-        val ignoreList = listOf("REPÚBLICA", "FEDERATIVA", "BRASIL", "MINISTÉRIO", "TRÂNSITO", "SECRETARIA", "ESTADO", "SEGURANÇA", "PÚBLICA", "CARTEIRA", "IDENTIDADE", "NACIONAL", "HABILITAÇÃO")
-        val lines = text.split("\n")
+    private fun extractStructuredData(visionText: Text): ExtractedData {
+        val blocks = visionText.textBlocks
+        val allLines = mutableListOf<String>()
         
-        // Tenta achar a primeira linha que seja toda em maiúscula, tenha mais de 5 letras, e não seja uma das palavras ignoradas
-        for (line in lines) {
-            val cleanLine = line.trim()
-            if (cleanLine.length > 5 && cleanLine == cleanLine.uppercase()) {
-                val words = cleanLine.split(" ")
-                if (words.size >= 2 && !ignoreList.any { cleanLine.contains(it) }) {
-                    return cleanLine
+        var cpf: String? = null
+        var rg: String? = null
+        var name: String? = null
+        var gender: String? = null
+        val allDates = mutableListOf<String>()
+        
+        val cpfRegex = Regex("""\d{3}[\.\s]?\d{3}[\.\s]?\d{3}[-\s]?\d{2}""")
+        val dateRegex = Regex("""\d{2}/\d{2}/\d{4}""")
+
+        // 1. Coleta básica e varredura de linhas
+        for (block in blocks) {
+            val blockText = block.text
+            
+            for (line in block.lines) {
+                allLines.add(line.text.trim())
+            }
+            
+            if (cpf == null) {
+                cpf = cpfRegex.find(blockText)?.value
+            }
+            
+            allDates.addAll(dateRegex.findAll(blockText).map { it.value }.toList())
+            
+            if (gender == null) {
+                if (blockText.contains("MASCULINO", ignoreCase = true)) gender = "M"
+                else if (blockText.contains("FEMININO", ignoreCase = true)) gender = "F"
+            }
+        }
+
+        // --- 2. EXTRAÇÃO DE RG (APRIMORADA COM CLEAN LINE) ---
+        val cleanRgRegex = Regex("""\d{1,2}\.?\d{3}\.?\d{3}-?[0-9X]{1,2}""", RegexOption.IGNORE_CASE)
+        val strictRgRegex = Regex("""\d{1,2}\.\d{3}\.\d{3}-[0-9X]{1,2}""", RegexOption.IGNORE_CASE)
+
+        for (line in allLines) {
+            val upperLine = line.uppercase()
+            // Procura pelas labels comuns, incluindo "RG:" ou a palavra solta "RG"
+            if (upperLine.contains("REGISTRO GERAL") || 
+                upperLine.contains("IDENTIDADE") || 
+                upperLine.contains("RG:") || 
+                upperLine.matches(Regex(""".*\bRG\b.*"""))) {
+                
+                // Remove TODOS os espaços da linha para consertar leituras como "1 68"
+                val cleanLine = upperLine.replace(" ", "")
+                val match = cleanRgRegex.find(cleanLine)?.value
+                if (match != null) {
+                    rg = match
+                    break
                 }
             }
         }
-        return null
+
+        // Fallback do RG: Se o OCR não leu a label "RG", varre o texto todo procurando o formato exato com pontos e traço
+        if (rg == null) {
+            for (line in allLines) {
+                val cleanLine = line.uppercase().replace(" ", "")
+                val match = strictRgRegex.find(cleanLine)?.value
+                // Se achou, garante que não está pegando um pedaço do CPF por engano
+                if (match != null && (cpf == null || !cpf!!.replace(Regex("""[^\d]"""), "").contains(match.replace(Regex("""[^\d]"""), "")))) {
+                    rg = match
+                    break
+                }
+            }
+        }
+
+        // --- 3. BUSCA DE NOME APRIMORADA ---
+        val ignoreList = listOf(
+            "REPÚBLICA", "FEDERATIVA", "MINISTÉRIO", "NOME", "ASSINATURA", 
+            "TITULAR", "IDENTIDADE", "REGISTRO GERAL", "FILIAÇÃO", "LOCAL", 
+            "DATA", "VALIDADE", "DOC", "ORIGEM", "CPF", "NATURALIDADE", "LEI"
+        )
+        
+        for (i in allLines.indices) {
+            val line = allLines[i]
+            
+            if (line.contains("NOME", ignoreCase = true) && 
+                !line.contains("PAI", ignoreCase = true) && 
+                !line.contains("MÃE", ignoreCase = true)) {
+                
+                val possibleNameInSameLine = line.replace(Regex("NOME( DO TITULAR)?", RegexOption.IGNORE_CASE), "").replace(":", "").trim()
+                
+                if (possibleNameInSameLine.length > 5 && !ignoreList.any { possibleNameInSameLine.contains(it, ignoreCase = true) }) {
+                    name = possibleNameInSameLine
+                    break
+                } 
+                else if (i + 1 < allLines.size) {
+                    val nextLine = allLines[i + 1]
+                    if (nextLine.length > 5 && !ignoreList.any { nextLine.contains(it, ignoreCase = true) }) {
+                        name = nextLine
+                        break
+                    } 
+                    else if (i + 2 < allLines.size) {
+                        val nextNextLine = allLines[i + 2]
+                        if (nextNextLine.length > 5 && !ignoreList.any { nextNextLine.contains(it, ignoreCase = true) }) {
+                            name = nextNextLine
+                            break
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- 4. CLASSIFICAÇÃO CRONOLÓGICA DE DATAS ---
+        var birthDate: String? = null
+        var issueDate: String? = null
+        
+        if (allDates.isNotEmpty()) {
+            val sortedDates = allDates.distinct().sortedBy { 
+                val parts = it.split("/")
+                if (parts.size == 3) "${parts[2]}${parts[1]}${parts[0]}" else "99999999" 
+            }
+            birthDate = sortedDates.firstOrNull()
+            
+            if (sortedDates.size > 1) {
+                issueDate = sortedDates.lastOrNull()
+            }
+        }
+        
+        return ExtractedData(cpf, rg, birthDate, issueDate, name, gender)
     }
 
     // --- MÉTODOS DE PROCESSAMENTO DE IMAGEM ---
@@ -254,7 +353,6 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
             val file = File(cachePath, "$filename.jpg")
             val stream = FileOutputStream(file)
             
-            // Qualidade em 100% para não perder resolução do documento
             bitmap.compress(Bitmap.CompressFormat.JPEG, 100, stream) 
             stream.close()
 
