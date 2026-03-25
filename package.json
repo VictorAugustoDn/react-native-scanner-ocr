@@ -1,6 +1,6 @@
 {
   "name": "@wisesystems/react-native-scanner-ocr",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Scanner de Documento + OCR dos dados do documento.",
   "main": "./lib/module/index.js",
   "types": "./lib/typescript/src/index.d.ts",
